@@ -1,0 +1,11 @@
+# Fase 1 (toy 2D no Mac): K = 16, MLP com d = 2, 5000 passos, tau 1 com escala pela mediana.
+# tau e tau_scale foram fixados ANTES de ver qualquer resultado (ver notes/fase1_toy.md).
+base: ../base/toy2d.yaml
+exp: khipu_toy
+device: cpu
+vq:
+  num_codes: 16
+  tau: 1.0
+  tau_scale: median
+train:
+  codebook_log_every: 50   # 101 snapshots do codebook para a figura de trajetória
