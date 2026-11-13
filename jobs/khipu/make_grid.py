@@ -46,7 +46,9 @@ def max_time(n_runs: int, steps: int, ms_per_step: float) -> str:
     return f"{math.ceil(minutes / 60)}h"  # os exemplos só usam minutos e horas inteiras
 
 
-def render(phase, est, ks, taus, seeds, tau_scale, steps, ms, memory):
+def render(
+    phase, est, ks, taus, seeds, tau_scale, steps, ms, memory, time_evidence, memory_evidence
+):
     ks_s, taus_s, seeds_s = (" ".join(map(str, v)) for v in (ks, taus, seeds))
     n = len(ks) * len(taus) * len(seeds)
     mt = max_time(n, steps, ms)
@@ -58,9 +60,9 @@ def render(phase, est, ks, taus, seeds, tau_scale, steps, ms, memory):
 #
 # Reenviar este job retoma do último checkpoint e pula o que já concluiu (run_group.sh --resume).
 #
-# max_time {mt}: 1ª ESTIMATIVA, de {ms:g} ms/passo x {n} execuções x {steps} passos x {MARGIN:g}
-# de folga. O ms/passo NÃO é medido no sauron (ver notes/fase2_khipu.md); estourar é barato.
-# memory {memory}: 1ª ESTIMATIVA, sem pico medido. Reajustar por `RAM do job:` no log do 1º job.
+# max_time {mt}: de {ms:g} ms/passo x {n} execuções x {steps} passos x {MARGIN:g} de folga.
+#   {time_evidence}
+# memory {memory}: {memory_evidence}
 name: {name}
 image: {IMAGE}
 gpus: 1
@@ -92,6 +94,8 @@ def main() -> None:
     ap.add_argument("--tau-scale", default="median", choices=["median", "null"])
     ap.add_argument("--steps", type=int, default=20000)
     ap.add_argument("--memory", default="8g")
+    ap.add_argument("--time-evidence", default="1ª ESTIMATIVA: ms/passo sem medida no sauron.")
+    ap.add_argument("--memory-evidence", default="1ª ESTIMATIVA, sem pico medido.")
     ap.add_argument("--out", default=str(HERE))
     args = ap.parse_args()
 
@@ -109,8 +113,10 @@ def main() -> None:
         "set -euo pipefail",
     ]
     for est in cfg["estimators"]:
-        name, text, mt = render(args.phase, est, cfg["ks"], taus, cfg["seeds"], args.tau_scale,
-                            args.steps, args.ms_per_step, args.memory)  # fmt: skip
+        name, text, mt = render(
+            args.phase, est, cfg["ks"], taus, cfg["seeds"], args.tau_scale, args.steps,
+            args.ms_per_step, args.memory, args.time_evidence, args.memory_evidence,
+        )  # fmt: skip
         fname = name.removeprefix("khipu-") + ".yaml"
         (out / fname).write_text(text)
         submit.append(f"sauron submit -c jobs/khipu/{fname} jobs/khipu/job.sh")

@@ -5,14 +5,14 @@
 #
 # Reenviar este job retoma do último checkpoint e pula o que já concluiu (run_group.sh --resume).
 #
-# max_time 1h: 1ª ESTIMATIVA, de 40 ms/passo x 3 execuções x 20000 passos x 1.3
-# de folga. O ms/passo NÃO é medido no sauron (ver notes/fase2_khipu.md); estourar é barato.
-# memory 8g: 1ª ESTIMATIVA, sem pico medido. Reajustar por `RAM do job:` no log do 1º job.
+# max_time 1h: de 25 ms/passo x 3 execuções x 20000 passos x 1.3 de folga.
+#   Medido no smoke (job #3343, B200 MIG 89 GB, 200 passos incl. 1 avaliação): ste 14,9/17,1 e gate_cb 16,5/20,3 ms/passo em K=1024/8192; 25 arredonda para cima (gate_norm e dense_st não medidos).
+# memory 3g: pico medido 1,6 GiB no smoke (#3343, 4 execuções, K até 8192); pico/0,7 = 2,3 -> 3g.
 name: khipu-pilot-gate-cb
 image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
 gpus: 1
 vram: 89     # menor classe; o VQ-VAE é pequeno e o job gasta 89 GB da cota de qualquer jeito
-memory: 8g
+memory: 3g
 cpus: 2
 max_time: 1h
 

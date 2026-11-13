@@ -54,3 +54,22 @@ só um reenvio.
 
 Com 3 slots de 89 GB (cota de 268 GB), até 3 jobs rodam ao mesmo tempo, então cada fase leva
 aproximadamente o tempo de 1 a 2 "ondas" de jobs.
+
+## Medido no Sauron (smoke, job #3343, 13/11/2026)
+GPU: NVIDIA B200 MIG 3g.90gb (89 GiB); torch 2.13.0+cu130 e torchvision 0.28.0 da imagem; commit 6f3d789.
+200 passos por execução, com 1 avaliação de 10k imagens incluída (limite superior; a 1ª execução
+também paga o aquecimento do CUDA):
+
+| K | ste (ms/passo) | gate_cb (ms/passo) |
+|---|---|---|
+| 1024 | 14,9 | 16,5 |
+| 8192 | 17,1 | 20,3 |
+
+Na Mac (MPS) a mesma execução levou 34,6 a 39,2 ms (K=1024) e 52,6 a 98,4 ms (K=8192): o Sauron
+foi ~2,3x mais rápido em K=1024 e ~2,6 a 4,8x em K=8192. Por execução de 20k passos isso dá
+~5 a 7 min no Sauron (estimativa a partir de 200 passos; gate_norm e dense_st NÃO medidos).
+Cada job de 3 execuções deve levar ~15 a 20 min.
+RAM do host (cgroup): pico 1,6 GiB com as 4 execuções (download: 1,0 GiB), de 8 GiB pedidos
+(20%, over-request). Dimensionado pela regra pico/0,7: `memory: 3g` no piloto.
+O `max_time` do piloto ficou em 1h (25 ms/passo, arredondado para cima por causa dos estimadores
+não medidos): é folga grande; se o piloto mostrar tempo real menor, baixar nas fases seguintes.
