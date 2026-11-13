@@ -73,3 +73,47 @@ RAM do host (cgroup): pico 1,6 GiB com as 4 execuções (download: 1,0 GiB), de 
 (20%, over-request). Dimensionado pela regra pico/0,7: `memory: 3g` no piloto.
 O `max_time` do piloto ficou em 1h (25 ms/passo, arredondado para cima por causa dos estimadores
 não medidos): é folga grande; se o piloto mostrar tempo real menor, baixar nas fases seguintes.
+
+---
+# Resultado do piloto (escrito DEPOIS de rodar; as seções acima não foram alteradas)
+
+Jobs #3344, #3345 e #3346 (commit 908bfeb, B200 MIG 89 GB), 13/11/2026. K = 1024, seed 0 (n = 1),
+20000 passos, métricas do conjunto de teste no passo final (sem early stopping). Fonte: `metrics.csv`
+e `done.json` de runs/khipu/ no cluster. `tau_eff = tau x mediana`, com mediana = 0,3879 (igual nos
+3 estimadores, como esperado). `qe` = quant_err.
+
+| estimador | tau | MSE | PSNR | códigos usados % | perplexidade | qe | log10(qe/tau_eff) | melhor MSE nas 10 avaliações |
+|---|---|---|---|---|---|---|---|---|
+| gate_norm | 0,1 | 0,01104 | 19,57 | 13,1 | 21,0 | 4,27e-02 | 0,04 | 0,00902 |
+| gate_norm | 1 | 0,00582 | 22,35 | 63,9 | 188,0 | 2,47e-02 | -1,20 | 0,00556 |
+| gate_norm | 10 | 0,06171 | 12,10 | 0,7 | 1,0 | 7,15e-06 | -5,73 | 0,01309 |
+| gate_cb | 0,1 | 0,00452 | 23,45 | 71,3 | 156,5 | 1,379 | 1,55 | 0,00444 |
+| gate_cb | 1 | 0,00436 | 23,60 | 63,6 | 252,4 | 1,124 | 0,46 | 0,00428 |
+| gate_cb | 10 | 0,00599 | 22,23 | 33,1 | 49,7 | 1,504 | -0,41 | 0,00571 |
+| dense_st | 0,1 | 0,00351 | 24,54 | 92,3 | 434,8 | 0,4824 | 1,09 | 0,00345 |
+| dense_st | 1 | 0,06184 | 12,09 | 0,3 | 1,0 | 2,14e-06 | -5,26 | 0,06182 |
+| dense_st | 10 | 0,06184 | 12,09 | 0,2 | 1,0 | 1,18e-06 | -6,52 | 0,06184 |
+
+## Leitura contra as expectativas escritas antes
+1. "tau maior (10 x mediana) dá mais códigos usados nos gate_*": CONTRÁRIA. Com tau = 10, gate_norm
+   e dense_st terminam colapsados em ~1 código (perplexidade 1,0, MSE ~0,062), e o gate_cb cai de
+   63,6% (tau = 1) para 33,1%. dense_st também colapsa em tau = 1.
+2. "sem diferença sistemática entre os três tau": CONTRÁRIA. A diferença é grande e o melhor tau
+   depende do estimador: gate_norm melhor em 1, gate_cb em 1 (0,1 quase igual), dense_st só em 0,1.
+3. A hipótese do toy (tau congelado minúsculo satura o softmax) NÃO se reproduz em magnitude: em
+   CIFAR a mediana do 1o batch é 0,388, não 1e-3. Os colapsos ocorrem justamente com tau grande.
+   Que um tau grande deixe p quase uniforme e o gradiente de dense_st/gate_norm pouco informativo é
+   HIPÓTESE, NÃO VERIFICADO.
+
+## Cuidados
+- n = 1 seed: a ordem entre estimadores e a escolha do tau podem mudar com outras seeds.
+- gate_norm com tau = 10 chegou a 0,0131 de MSE no melhor ponto e terminou em 0,0617: o colapso
+  veio tarde (passo final usa o último checkpoint, sem escolher o melhor).
+- Escolher tau por estas métricas é seleção no conjunto de teste, e a seed 0 do piloto reaparece
+  na grade principal.
+
+## Tempo e RAM medidos (a atualizar nas fases seguintes)
+Cada execução levou 143 a 171 s (7,6 a 8,6 ms/passo); cada job de 3 execuções ~7 a 8 min. O smoke
+(15 a 20 ms/passo) superestimou ~2x por incluir aquecimento. RAM do host: pico 1,5 a 1,6 GiB de
+3 GiB (52 a 53%), dentro da faixa de 50 a 90%: manter `memory: 3g`. O `max_time` de 1h ficou
+~7x acima do necessário: nas fases seguintes usar ~10 ms/passo (o gerador arredonda para 30m).
