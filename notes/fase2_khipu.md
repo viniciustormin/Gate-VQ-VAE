@@ -117,3 +117,14 @@ Cada execução levou 143 a 171 s (7,6 a 8,6 ms/passo); cada job de 3 execuçõe
 (15 a 20 ms/passo) superestimou ~2x por incluir aquecimento. RAM do host: pico 1,5 a 1,6 GiB de
 3 GiB (52 a 53%), dentro da faixa de 50 a 90%: manter `memory: 3g`. O `max_time` de 1h ficou
 ~7x acima do necessário: nas fases seguintes usar ~10 ms/passo (o gerador arredonda para 30m).
+
+## Decisão do tau para as fases (b) e (c) (Vinícius, 13/11/2026)
+tau POR ESTIMADOR, escolhido pelo melhor MSE final de cada um no piloto: gate_norm = 1, gate_cb = 1,
+dense_st = 0,1. ste e ste_ema não usam tau; levam tau = 1 só no nome da pasta da execução
+(`ste_K1024_tau1med_s0`). O mesmo mapa vale no K = 8192.
+Desvio do pedido original (um tau único), declarado: um tau único faria dense_st colapsar (tau >= 1)
+ou gate_norm piorar (tau = 0,1). Para o paper declarar: (1) tau escolhido por estimador, (2) escolha
+feita no conjunto de teste, (3) com 1 seed, que reaparece na grade principal, e (4) o melhor tau do
+dense_st está na borda da grade testada (0,1 é o menor valor): o ótimo pode estar abaixo.
+Os 5 jobs da fase (b) e os 3 da (c) foram gerados com `make_grid.py` (jobs/khipu/main-*.yaml e
+k8192-*.yaml, mais submit-main.sh e submit-k8192.sh).

@@ -1,0 +1,30 @@
+# Fase k8192 do khipu: ste, K=8192, tau=1 (escala median),
+# seeds 0 1 2: 3 execuções de 20000 passos, em sequência, na mesma GPU.
+#
+#   sauron submit -c jobs/khipu/k8192-ste.yaml jobs/khipu/job.sh
+#
+# Reenviar este job retoma do último checkpoint e pula o que já concluiu (run_group.sh --resume).
+#
+# tau escolhido pelo Vinícius a partir do piloto (notes/fase2_khipu.md):
+# por estimador, seleção no conjunto de teste, seed 0.
+#
+# max_time 30m: 20 ms/passo x 3 execuções x 20000 passos x 1.3 de folga.
+#   K=8192 NÃO medido em 20k passos: 20 ms/passo é o limite superior do smoke (#3343, gate_cb K=8192 com 20,3 ms em 200 passos, com aquecimento); em K=1024 o piloto saiu ~2x abaixo do smoke.
+# memory 3g: pico 1,6 GiB no smoke (#3343) com K=8192 e 1,5 a 1,6 GiB no piloto (K=1024): 3g.
+name: khipu-k8192-ste
+image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
+gpus: 1
+vram: 89     # menor classe; o VQ-VAE é pequeno e o job gasta 89 GB da cota de qualquer jeito
+memory: 3g
+cpus: 2
+max_time: 30m
+
+workspace: Gate-VQ-VAE
+
+env:
+  EXP: "khipu"
+  ESTIMATORS: "ste"
+  SEEDS: "0 1 2"
+  KS: "8192"
+  TAUS: "1"
+  TAU_SCALE: "median"

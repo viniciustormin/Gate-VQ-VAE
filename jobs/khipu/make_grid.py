@@ -1,13 +1,16 @@
 """Gera os yamls dos jobs do sauron e o script de submissão de uma fase da grade khipu.
 
     uv run python jobs/khipu/make_grid.py pilot --ms-per-step 40
-    uv run python jobs/khipu/make_grid.py main  --ms-per-step 40 --tau 1
-    uv run python jobs/khipu/make_grid.py k8192 --ms-per-step 60 --tau 1
+    uv run python jobs/khipu/make_grid.py main  --ms-per-step 10 --tau 1 --tau-map dense_st=0.1
+    uv run python jobs/khipu/make_grid.py k8192 --ms-per-step 20 --tau 1 --tau-map dense_st=0.1
 
 Fases (um job por estimador, as execuções do job rodam em sequência):
     pilot  gate_norm, gate_cb, dense_st | K=1024 | seed 0         | tau em {0.1, 1, 10} x mediana
-    main   os 5 estimadores             | K=1024 | seeds 0, 1, 2  | tau escolhido (--tau)
-    k8192  ste, gate_cb, dense_st       | K=8192 | seeds 0, 1, 2  | tau escolhido (--tau)
+    main   os 5 estimadores             | K=1024 | seeds 0, 1, 2  | tau escolhido por estimador
+    k8192  ste, gate_cb, dense_st       | K=8192 | seeds 0, 1, 2  | tau escolhido por estimador
+
+Em main e k8192 o tau de cada estimador vem de --tau-map (estimador=tau,...); quem não está no
+mapa usa --tau (ste e ste_ema não usam tau: ele só entra no nome da pasta da execução).
 
 O script NÃO submete nada: escreve jobs/khipu/<fase>-<estimador>.yaml e jobs/khipu/submit-<fase>.sh,
 que o Vinícius roda no login do sauron. Só usa chaves de yaml do guia e dos exemplos.
@@ -53,6 +56,12 @@ def render(
     n = len(ks) * len(taus) * len(seeds)
     mt = max_time(n, steps, ms)
     name = f"khipu-{phase}-{est.replace('_', '-')}"
+    tau_note = (
+        ""
+        if phase == "pilot"
+        else "# tau escolhido pelo Vinícius a partir do piloto (notes/fase2_khipu.md):\n"
+        "# por estimador, seleção no conjunto de teste, seed 0.\n#\n"
+    )
     text = f"""# Fase {phase} do khipu: {est}, K={ks_s}, tau={taus_s} (escala {tau_scale}),
 # seeds {seeds_s}: {n} execuções de {steps} passos, em sequência, na mesma GPU.
 #
@@ -60,7 +69,7 @@ def render(
 #
 # Reenviar este job retoma do último checkpoint e pula o que já concluiu (run_group.sh --resume).
 #
-# max_time {mt}: de {ms:g} ms/passo x {n} execuções x {steps} passos x {MARGIN:g} de folga.
+{tau_note}# max_time {mt}: {ms:g} ms/passo x {n} execuções x {steps} passos x {MARGIN:g} de folga.
 #   {time_evidence}
 # memory {memory}: {memory_evidence}
 name: {name}
@@ -90,7 +99,8 @@ def main() -> None:
     )
     ap.add_argument("phase", choices=sorted(PHASES))
     ap.add_argument("--ms-per-step", type=float, required=True)
-    ap.add_argument("--tau", help="tau escolhido (obrigatório em main e k8192)")
+    ap.add_argument("--tau", help="tau dos estimadores fora do --tau-map (ste, ste_ema)")
+    ap.add_argument("--tau-map", default="", help="estimador=tau,... (obrigatório em main e k8192)")
     ap.add_argument("--tau-scale", default="median", choices=["median", "null"])
     ap.add_argument("--steps", type=int, default=20000)
     ap.add_argument("--memory", default="8g")
@@ -100,11 +110,7 @@ def main() -> None:
     args = ap.parse_args()
 
     cfg = PHASES[args.phase]
-    taus = cfg["taus"]
-    if taus is None:
-        if args.tau is None:
-            raise SystemExit(f"a fase {args.phase} exige --tau (escolhido depois do piloto)")
-        taus = [args.tau]
+    tau_map = dict(item.split("=") for item in args.tau_map.split(",") if item)
     out = Path(args.out)
     submit = [
         "#!/bin/bash",
@@ -113,6 +119,12 @@ def main() -> None:
         "set -euo pipefail",
     ]
     for est in cfg["estimators"]:
+        taus = cfg["taus"]
+        if taus is None:
+            tau = tau_map.get(est, args.tau)
+            if tau is None:
+                raise SystemExit(f"{est}: sem tau (use --tau-map {est}=<tau> ou --tau)")
+            taus = [tau]
         name, text, mt = render(
             args.phase, est, cfg["ks"], taus, cfg["seeds"], args.tau_scale, args.steps,
             args.ms_per_step, args.memory, args.time_evidence, args.memory_evidence,
