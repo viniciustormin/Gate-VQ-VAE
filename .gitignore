@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Configuração local do Claude Code (inclui o CLAUDE.md do projeto, não versionado)
+.claude/
+
+# Dados, execuções e checkpoints do projeto
+data/
+runs/
+checkpoints/
+*.pt
