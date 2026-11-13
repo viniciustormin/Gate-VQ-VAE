@@ -90,3 +90,16 @@ def test_run_dir_layout_and_artifacts(tmp_path):
     ck = torch.load(rd / "ckpt.pt", weights_only=False)
     assert {"step", "model", "optimizer", "rng", "tau_eff"} <= ck.keys()
     assert ck["tau_eff"] > 0
+
+
+def test_codebook_trajectory_survives_resume(tmp_path):
+    import numpy as np
+
+    extra = {"train.codebook_log_every": 5}
+    cont = train(cfg_for(tmp_path, exp="tc", **extra))
+    train(cfg_for(tmp_path, exp="tr", max_steps=20, **extra))
+    rd = train(cfg_for(tmp_path, exp="tr", max_steps=40, **extra), resume=True)
+    a, b = np.load(cont / "codebook_traj.npz"), np.load(rd / "codebook_traj.npz")
+    assert list(a["steps"]) == list(range(0, 41, 5)) == list(b["steps"])
+    assert np.array_equal(a["codebooks"], b["codebooks"])
+    assert a["codebooks"].shape == (9, 8, 2)

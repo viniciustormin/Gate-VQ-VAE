@@ -217,6 +217,9 @@ def train(cfg: dict, resume: bool = False) -> Path:
     opt = torch.optim.Adam(params, lr=float(tc["lr"]))
 
     start, wall0 = 0, 0.0
+    # trajetória do codebook (opcional, p.ex. para a figura do toy): snapshots a cada N passos
+    log_every = int(tc.get("codebook_log_every", 0))
+    traj: list[tuple[int, np.ndarray]] = []
     rd.mkdir(parents=True, exist_ok=True)
     if resume and ckpt_path.exists():
         ck = torch.load(ckpt_path, map_location="cpu", weights_only=False)
@@ -224,6 +227,7 @@ def train(cfg: dict, resume: bool = False) -> Path:
         opt.load_state_dict(ck["optimizer"])
         set_rng_state(ck["rng"])
         start, wall0 = int(ck["step"]), float(ck["wall_s"])
+        traj = [t for t in ck.get("traj", []) if t[0] <= start]
         rows = [r for r in _read_rows(csv_path) if int(r["step"]) <= start]
         _write_rows(csv_path, rows)
         with (rd / "commit.txt").open("a") as f:
@@ -232,6 +236,8 @@ def train(cfg: dict, resume: bool = False) -> Path:
     else:
         _write_rows(csv_path, [])
         (rd / "commit.txt").write_text(f"{git_commit()}\n")
+        if log_every:
+            traj.append((0, model.vq.codebook.detach().cpu().numpy().copy()))
     (rd / "config.yaml").write_text(yaml.safe_dump(cfg, sort_keys=False, allow_unicode=True))
 
     model.train()
@@ -252,6 +258,8 @@ def train(cfg: dict, resume: bool = False) -> Path:
         acc_n += 1
 
         s = step + 1
+        if log_every and s % log_every == 0:
+            traj.append((s, model.vq.codebook.detach().cpu().numpy().copy()))
         if s % eval_every == 0 or s == max_steps:
             tl, tr = float(acc_loss) / acc_n, float(acc_rec) / acc_n
             if not (np.isfinite(tl) and np.isfinite(tr)):
@@ -269,18 +277,23 @@ def train(cfg: dict, resume: bool = False) -> Path:
             rows = _read_rows(csv_path)
             rows.append({k: repr(v) if isinstance(v, float) else v for k, v in row.items()})
             _write_rows(csv_path, rows)
-            save_atomic(
-                {
-                    "step": s,
-                    "model": model.state_dict(),
-                    "optimizer": opt.state_dict(),
-                    "rng": get_rng_state(device),
-                    "tau_eff": float(model.vq.tau_eff),
-                    "wall_s": wall,
-                    "config": cfg,
-                },
-                ckpt_path,
-            )
+            ck_obj = {
+                "step": s,
+                "model": model.state_dict(),
+                "optimizer": opt.state_dict(),
+                "rng": get_rng_state(device),
+                "tau_eff": float(model.vq.tau_eff),
+                "wall_s": wall,
+                "config": cfg,
+            }
+            if log_every:
+                ck_obj["traj"] = traj
+                np.savez(
+                    rd / "codebook_traj.npz",
+                    steps=np.array([t[0] for t in traj]),
+                    codebooks=np.stack([t[1] for t in traj]),
+                )
+            save_atomic(ck_obj, ckpt_path)
             acc_loss, acc_rec, acc_n = zero.clone(), zero.clone(), 0
             print(
                 f"[{run_name(cfg)}] passo {s}/{max_steps} mse={final['test_mse']:.5f} "
