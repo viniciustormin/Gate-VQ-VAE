@@ -1,0 +1,28 @@
+# Smoke e medida de tempo no sauron: 200 passos de 4 execuções (ste e gate_cb, K = 1024 e 8192),
+# guardadas em runs/khipu_smoke (NÃO em runs/khipu). Rode depois do download:
+#
+#   sauron submit -c jobs/khipu/smoke.yaml jobs/khipu/job.sh
+#
+# O que ele responde: a GPU é vista, o código roda com o torch 2.13 da imagem, e quantos ms/passo
+# (inclui 1 avaliação de 10k imagens por execução, então é um limite superior) para dimensionar
+# o max_time da grade (`make_grid.py --ms-per-step`). O fim do log imprime a tabela de tempos.
+# memory 8g: 1ª ESTIMATIVA; o `RAM do job:` do fim do log dá o pico medido.
+name: khipu-smoke
+image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
+gpus: 1
+vram: 89
+memory: 8g
+cpus: 2
+max_time: 30m
+
+workspace: Gate-VQ-VAE
+
+env:
+  EXP: "khipu_smoke"
+  ESTIMATORS: "ste gate_cb"
+  SEEDS: "0"
+  KS: "1024 8192"
+  TAUS: "1"
+  TAU_SCALE: "median"
+  MAX_STEPS: "200"
+  EVAL_EVERY: "200"

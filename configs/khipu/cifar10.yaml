@@ -1,0 +1,7 @@
+# Experimento khipu em CIFAR-10 (sauron). estimator, seed, K, tau e tau_scale chegam por --override
+# (jobs/khipu/run_group.sh). Treino do pedido: Adam 3e-4, batch 128, 20k passos, avaliação a cada 2k.
+base: ../base/cifar10.yaml
+exp: khipu
+require_cuda: true   # no sauron: recusa CPU/MPS (a GPU já sumiu no meio de um job)
+vq:
+  tau_scale: median

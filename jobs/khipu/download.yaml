@@ -1,0 +1,16 @@
+# Baixa o CIFAR-10 (~170 MB) para ~/workspace/Gate-VQ-VAE/data. Rode UMA vez, antes de qualquer outro job:
+#
+#   sauron submit -c jobs/khipu/download.yaml jobs/khipu/download.sh
+#
+# O corpo não usa GPU: a menor classe é pedida só porque todo job do Sauron aloca uma (como o
+# p0-modelos dos exemplos, que também só baixa arquivos).
+# memory 4g: 1ª ESTIMATIVA, sem pico medido (carrega só o tarball e o pyyaml).
+name: khipu-download
+image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
+gpus: 1
+vram: 89
+memory: 4g
+cpus: 2
+max_time: 30m
+
+workspace: Gate-VQ-VAE
