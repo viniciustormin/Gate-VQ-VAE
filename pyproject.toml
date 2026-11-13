@@ -1,0 +1,36 @@
+[project]
+name = "vqrouter"
+version = "0.1.0"
+description = "Estimadores de gradiente para a camada de quantização de um VQ-VAE (VQ como MoE degenerado)"
+readme = "README.md"
+authors = [
+    { name = "Vinícius Tormin", email = "170100959+viniciustormin@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.11.2",
+    "numpy>=2.4.6",
+    "pyyaml>=6.0.3",
+    "torch>=2.15.0",
+    "torchvision>=0.29.2",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
