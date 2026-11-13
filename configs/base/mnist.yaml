@@ -1,0 +1,26 @@
+# Base MNIST. Valores do pedido: Adam lr 3e-4, batch 128, 20k passos, avaliação a cada 2k.
+exp: dev
+seed: 0
+estimator: ste
+dataset: mnist
+runs_dir: runs
+device: auto          # auto: cuda > mps > cpu
+require_cuda: false   # true nos jobs do sauron: recusa rodar em CPU/MPS
+data:
+  root: data
+model:
+  name: conv_vqvae
+  hidden: 128
+  dim: 64
+vq:
+  num_codes: 1024
+  beta: 0.25
+  tau: 1.0
+  tau_scale: null     # null | median
+  codebook_loss: null # null = padrão do estimador
+  ema_decay: 0.99
+train:
+  lr: 3.0e-4
+  batch_size: 128
+  max_steps: 20000
+  eval_every: 2000

@@ -1,0 +1,19 @@
+# Toy 2D: 8 gaussianas em anel; encoder/decoder MLP com d = 2 (codewords no plano dos dados).
+base: mnist.yaml
+dataset: toy2d
+data:
+  components: 8
+  radius: 2.0
+  sigma: 0.1
+  n_train: 8192
+  n_test: 2048
+  data_seed: 0
+model:
+  name: mlp_vqvae
+  hidden: 64
+  dim: 2
+vq:
+  num_codes: 16
+train:
+  max_steps: 5000
+  eval_every: 500
