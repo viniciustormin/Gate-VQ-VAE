@@ -4,6 +4,7 @@
     uv run python jobs/khipu/make_grid.py main  --ms-per-step 10 --tau 1 --tau-map dense_st=0.1
     uv run python jobs/khipu/make_grid.py k8192 --ms-per-step 20 --tau 1 --tau-map dense_st=0.1
     uv run python jobs/khipu/make_grid.py val     --ms-per-step 9
+    uv run python jobs/khipu/make_grid.py rerun   --ms-per-step 12
     uv run python jobs/khipu/make_grid.py val8192 --ms-per-step 12
 
 Fases (um job por estimador, as execuções do job rodam em sequência):
@@ -12,6 +13,7 @@ Fases (um job por estimador, as execuções do job rodam em sequência):
     k8192  ste, gate_cb, dense_st       | K=8192 | seeds 0, 1, 2  | tau escolhido por estimador
     val    gate_norm, gate_cb, dense_st | K=1024 | seeds 0, 1, 2  | tau em {0.01 ... 10}, 7 valores
     val8192 gate_cb, dense_st           | K=8192 | seeds 0, 1, 2  | os mesmos 7 valores de tau
+    rerun  as 3 células cujo tau por validação difere da principal (um job cada), em runs/khipu
            em runs/khipu_val, com 5000 imagens do TREINO como validação (data.holdout); um job por
            estimador e seed. Escolha de tau por validação: notes/followup_ressalvas.md.
 
@@ -54,6 +56,11 @@ PHASES = {
         extra="data.holdout=5000",
         split_seeds=True,  # um job por (estimador, seed)
     ),
+    "rerun": dict(  # células cujo tau escolhido por validação difere da grade principal
+        jobs=[("gate_norm", 1024, "0.1"), ("dense_st", 1024, "0.01"), ("dense_st", 8192, "0.03")],
+        seeds=[0, 1, 2],
+        exp="khipu",
+    ),
     "val8192": dict(
         estimators=["gate_cb", "dense_st"],
         ks=[8192],
@@ -81,12 +88,17 @@ def render(
     n = len(ks) * len(taus) * len(seeds)
     mt = max_time(n, steps, ms)
     name = f"khipu-{phase}-{est.replace('_', '-')}"
+    if phase == "rerun":
+        name += f"-k{ks[0]}"
     if len(seeds) == 1 and phase.startswith("val"):
         name += f"-s{seeds[0]}"
     extra_line = f'  EXTRA_OVERRIDES: "{extra}"\n' if extra else ""
     tau_note = (
         ""
         if phase == "pilot"
+        else "# Reexecução: tau escolhido por VALIDAÇÃO (scripts/select_tau.py) que difere do\n"
+        "# usado na grade principal; ver notes/followup_ressalvas.md.\n#\n"
+        if phase == "rerun"
         else "# Varredura de tau por VALIDAÇÃO (5000 imagens do treino):\n"
         "# notes/followup_ressalvas.md.\n#\n"
         if phase.startswith("val")
@@ -149,8 +161,11 @@ def main() -> None:
         "#   cd ~/workspace/Gate-VQ-VAE && bash jobs/khipu/submit-" + args.phase + ".sh",
         "set -euo pipefail",
     ]
-    for est in cfg["estimators"]:
-        taus = cfg["taus"]
+    if cfg.get("jobs"):  # fase com (estimador, K, tau) por job
+        plan = [(est, [k], [tau]) for est, k, tau in cfg["jobs"]]
+    else:
+        plan = [(est, cfg["ks"], cfg["taus"]) for est in cfg["estimators"]]
+    for est, ks, taus in plan:
         if taus is None:
             tau = tau_map.get(est, args.tau)
             if tau is None:
@@ -159,7 +174,7 @@ def main() -> None:
         seed_groups = [[sd] for sd in cfg["seeds"]] if cfg.get("split_seeds") else [cfg["seeds"]]
         for seeds in seed_groups:
             name, text, mt = render(
-                args.phase, est, cfg["ks"], taus, seeds, args.tau_scale, args.steps,
+                args.phase, est, ks, taus, seeds, args.tau_scale, args.steps,
                 args.ms_per_step, args.memory, args.time_evidence, args.memory_evidence,
                 exp=cfg.get("exp", "khipu"), extra=cfg.get("extra", ""),
             )  # fmt: skip
