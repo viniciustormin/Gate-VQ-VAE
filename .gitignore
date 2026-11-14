@@ -227,3 +227,11 @@ data/
 runs/
 checkpoints/
 *.pt
+
+# Artefatos de build do paper (o PDF se gera com tectonic main.tex)
+paper/khipu/main.aux
+paper/khipu/main.bbl
+paper/khipu/main.blg
+paper/khipu/main.log
+paper/khipu/main.out
+paper/khipu/main.pdf
