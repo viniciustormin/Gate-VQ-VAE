@@ -115,3 +115,40 @@ runs/khipu_val:
   grade principal e continua sem.
 - Se os tau escolhidos para K = 8192 diferirem do tau usado na grade principal (que reaproveitou o
   tau de K = 1024), a grade de K = 8192 é reexecutada nesse tau; a rodada original fica como está.
+
+---
+# Resultado de A (escrito DEPOIS de rodar; as seções acima não foram alteradas)
+
+Varredura de validação: 105 execuções (jobs #3396 a #3410, todos `succeeded` em 1 tentativa), 5000 imagens
+do treino como validação (as métricas "test_*" são de VALIDAÇÃO), baseline de validação MSE 0,06153
+(falha = MSE >= 0,05846). Tabela completa: paper/khipu/tables/table_tau_val.csv; escolha por
+`scripts/select_tau.py`, regra pré-registrada, resultado em configs/khipu/main_tau_val.yaml.
+
+| célula | tau escolhido | MSE de validação (média ± dp, n = 3) | tau da grade principal | coincide |
+|---|---|---|---|---|
+| gate_norm K=1024 | 0,1 | 0,01394 ± 0,00114 | 1 (0,01454 ± 0,00759) | NÃO |
+| gate_cb K=1024 | 1 | 0,00431 ± 0,00000 | 1 | sim |
+| dense_st K=1024 | 0,01 | 0,00339 ± 0,00015 | 0,1 (0,00339 ± 0,00020) | NÃO |
+| gate_cb K=8192 | 1 | 0,00272 ± 0,00007 | 1 | sim |
+| dense_st K=8192 | 0,03 | 0,00261 ± 0,00005 | 0,1 (0,00630 ± 0,00603) | NÃO |
+
+## O que os dados dizem
+- gate_cb: o tau da grade principal (1) foi o escolhido nos dois K. A ressalva "escolhido no teste" não
+  mudou a escolha para este estimador.
+- dense_st K=1024: tau 0,01; 0,03 e 0,1 empatam em 0,00339. A regra (menor tau dentro de 1 dp do melhor)
+  escolhe 0,01; o tau 0,1 da grade principal está no empate e o MSE é o mesmo, mas a regra pede 0,01.
+- gate_norm K=1024: tau 0,1 e 1 estão dentro de 1 dp um do outro; o MSE de validação do gate_norm é
+  instável entre seeds (dp 0,0076 em tau 1). O MSE de validação em tau 1 (0,0145) é ~2,3x o MSE de teste da
+  grade principal (0,0063); nos outros estimadores validação e teste coincidem (gate_cb 0,00431 contra
+  0,00435; dense_st 0,00339 contra 0,00334). A causa NÃO foi investigada.
+- dense_st K=8192: tau >= 0,3 falha nas 3 seeds; tau 0,1 não falha em nenhuma seed mas tem média e dp
+  altos (0,0063 ± 0,0060), isto é, escapou do platô com tempos muito diferentes; tau 0,03 e 0,01 ficam em
+  0,0026 e 0,0027 com dp ~1e-4. Consistente com o diagnóstico B (o tau 0,1 está na zona de platô longo).
+- dense_st K=1024: tau >= 3 falha nas 3 seeds (como no piloto, que já mostrava tau 1 e 10 presos no teste;
+  aqui tau 1 ficou em 0,0095 e não falhou na validação).
+
+## Consequência (pela regra do plano): reexecutar as 3 células que diferem
+gate_norm K=1024 em tau 0,1; dense_st K=1024 em tau 0,01; dense_st K=8192 em tau 0,03; 3 seeds, treino
+completo (50k), teste de verdade. A seed 0 de gate_norm tau 0,1 (K=1024) já existe do piloto e é reutilizada
+(mesma configuração). As execuções originais (tau 1 e tau 0,1) ficam em runs/khipu como rodada original. A
+tabela principal do paper passa a usar configs/khipu/main_tau_val.yaml.

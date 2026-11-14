@@ -1,0 +1,12 @@
+# tau por (estimador, K) escolhido por VALIDAÇÃO (scripts/select_tau.py; regra em
+# notes/followup_ressalvas.md). ste e ste_ema não usam tau (valem o default).
+by_estimator_k:
+  dense_st:
+    1024: 0.01
+    8192: 0.03
+  gate_cb:
+    1024: 1.0
+    8192: 1.0
+  gate_norm:
+    1024: 0.1
+default: 1.0
