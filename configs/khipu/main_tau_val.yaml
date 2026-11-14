@@ -9,4 +9,5 @@ by_estimator_k:
     8192: 1.0
   gate_norm:
     1024: 0.1
+    8192: 0.3
 default: 1.0

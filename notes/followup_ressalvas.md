@@ -199,3 +199,11 @@ Expectativas (NÃO VERIFICADO; nenhum limiar a ser ajustado depois):
 3. Como o dense_st em K = 8192, o gate_norm pode ter platô e depender muito do tau; a varredura mostra.
 Se a varredura não tiver tau elegível (todas as seeds falham), relato isso e o gate_norm K = 8192 fica fora
 da tabela principal, declarado.
+
+---
+# Resultado da varredura de gate_norm em K = 8192 (escrito DEPOIS de rodar; as seções acima não foram alteradas)
+
+Jobs #3421 a #3423 (21 execuções de validação) e #3420 (ste_ema final), todos `succeeded`. Nenhum tau falha em
+nenhuma seed. Regra pré-registrada (scripts/select_tau.py): tau 0,3, validação 0,00572 ± 0,00086 (o segundo
+melhor, tau 1, tem 0,00886 ± 0,00432). As outras 5 células de main_tau_val.yaml não mudaram. Próximo passo:
+3 execuções finais do gate_norm K = 8192 em tau 0,3 no treino completo (job ext-gate-norm-k8192).
