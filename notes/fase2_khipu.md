@@ -128,3 +128,36 @@ feita no conjunto de teste, (3) com 1 seed, que reaparece na grade principal, e 
 dense_st está na borda da grade testada (0,1 é o menor valor): o ótimo pode estar abaixo.
 Os 5 jobs da fase (b) e os 3 da (c) foram gerados com `make_grid.py` (jobs/khipu/main-*.yaml e
 k8192-*.yaml, mais submit-main.sh e submit-k8192.sh).
+
+---
+# Fase 2 concluída (13/11/2026)
+
+Jobs #3349 a #3356, todos `succeeded` com 1 tentativa (commit fe5ea53 no cluster). Das 33 execuções
+previstas, 30 existem em disco: seed 0 de gate_norm (tau 1), gate_cb (tau 1) e dense_st (tau 0,1) da
+grade principal têm o mesmo nome de pasta do piloto e foram PULADAS, não refeitas (é a mesma
+execução, não só a mesma seed).
+
+## Tempo e recursos medidos (por execução de 20k passos, B200 MIG 89 GB)
+| K | estimador | tempo | ms/passo |
+|---|---|---|---|
+| 1024 | ste / ste_ema | 138 / 139 s | 6,9 / 6,9 |
+| 1024 | dense_st | 144 a 148 s | 7,2 a 7,4 |
+| 1024 | gate_norm / gate_cb | 151 / 155 s | 7,6 / 7,8 |
+| 8192 | ste | 180 s | 9,0 |
+| 8192 | gate_cb | 214 s | 10,7 |
+| 8192 | dense_st | 228 s | 11,4 |
+
+Pico de RAM do host por job: 1,33 a 1,55 GB (de 3 GB pedidos: 43 a 52%); com a regra pico/0,7,
+`memory: 2g` bastaria (76% no pior caso). Pico de VRAM: 1,8 a 2,3 GB em K = 1024 e 5,6 a 8,1 GB em
+K = 8192. `max_time` de 30m para jobs de 3 execuções que levaram ~7 a 12 min: 20m bastaria.
+
+## Fato registrado: dense_st em K = 8192, seed 0 NÃO APRENDEU (não é colapso de códigos)
+dense_st K = 8192 tau = 0,1: seed 0 ficou com MSE final 0,0618 desde o passo 2000 (train_recon
+0,062 o tempo todo) e as seeds 1 e 2 chegaram a 0,0031 e 0,0028. O MSE 0,0618 é o de PREVER SEMPRE A
+IMAGEM MÉDIA do treino (0,06178 medido no teste: razão 1,001). Mas, ao contrário dos colapsos do
+piloto (perplexidade 1,0, ~0,3% dos códigos), nesta execução 69% dos códigos seguem em uso
+(perplexidade 751) e o quant_err é ~1e-6 (o encoder encosta nos códigos). Ou seja: a reconstrução
+nunca saiu do baseline com os códigos em uso; o mecanismo é outro e NÃO foi investigado
+(NÃO VERIFICADO). A primeira versão desta nota dizia "colapsou, o mesmo valor dos colapsos do
+piloto": só o valor do MSE é o mesmo. O tau 0,1 foi escolhido em K = 1024, seed 0, e em K = 8192 não
+foi retunado. Relatar como saiu: aggregate.py conta como "failed" quem tem MSE >= 0,95 x baseline.
