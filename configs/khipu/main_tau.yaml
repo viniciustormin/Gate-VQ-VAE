@@ -1,0 +1,9 @@
+# tau de cada estimador na tabela principal (decisão do Vinícius, 13/11/2026, a partir do piloto).
+# Fonte única: scripts/aggregate.py lê este arquivo; make_grid.py recebeu o mesmo mapa por --tau-map.
+# Escolhido por estimador, pelo melhor MSE final do piloto no CONJUNTO DE TESTE, seed 0, K = 1024
+# (ver notes/fase2_khipu.md). ste e ste_ema não usam tau: o valor só entra no nome da execução.
+default: 1.0
+by_estimator:
+  gate_norm: 1.0
+  gate_cb: 1.0
+  dense_st: 0.1
