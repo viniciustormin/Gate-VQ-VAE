@@ -14,6 +14,8 @@
 \input{tables/numbers_val.tex}          % varredura de tau na validacao
 \input{tables_tau_teste/numbers.tex}    % grade original (tau escolhido no teste), prefixo resOrig
 
+\setlength{\textfloatsep}{10pt plus 2pt minus 4pt}
+\setlength{\intextsep}{8pt plus 2pt minus 2pt}
 \newcommand{\todo}[1]{{\color{red}[TODO: #1]}}
 \newcommand{\sg}{\operatorname{sg}}
 \newcommand{\est}[1]{\texttt{#1}}
@@ -34,7 +36,7 @@ that a VQ layer is a degenerate MoE (codewords are constant experts, the nearest
 top-1 router) and compare STE with three gate-value estimators, on a 2-D toy and on CIFAR-10 with
 two codebook sizes. In this preliminary study (\resNSeeds{} seeds per cell) a dense gate estimator
 reaches the lowest reconstruction error at both sizes, the normalised gate-value estimator is worse
-than STE, and a gate estimator that keeps STE on the encoder uses far more of the codebook. The
+than STE at both, and a gate estimator that keeps STE on the encoder uses far more of the codebook. The
 dense estimator is very sensitive to the temperature: at large values its runs stay on a plateau at
 the error of predicting the mean image. We report all of it, including what contradicts our
 expectations.
@@ -126,8 +128,8 @@ batch and then frozen.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.94\textwidth]{figures/fig_toy_field_s0.pdf}\\[1pt]
-\includegraphics[width=0.94\textwidth]{figures/fig_toy_traj_s0.pdf}
+\includegraphics[width=0.9\textwidth]{figures/fig_toy_field_s0.pdf}\\[1pt]
+\includegraphics[width=0.9\textwidth]{figures/fig_toy_traj_s0.pdf}
 \caption{Toy 2-D problem (8 Gaussians on a ring, MLP encoder and decoder with $d=2$, $K=16$),
 seed 0 of 3. \textbf{Top:} $-\nabla_z L_{rec}$ on a grid of latent points, the target of each
 point being the test sample with the closest latent; the arrow scale is set per panel (median
@@ -146,8 +148,7 @@ towards the data (one seed of a toy problem).
 residual blocks, 128 channels, $d=64$, so $8\times8$ tokens per image), Adam with learning rate
 $3\cdot10^{-4}$, batch size 128, 20k steps, the same uniform codebook initialisation for every
 estimator, no dead-code reinitialisation. We report test reconstruction metrics at the last step
-for $K\in\{\resKA,\resKB\}$ and seeds 0--2; at $K=\resKB$ only \est{ste}, \est{gate\_cb} and
-\est{dense\_st} were run. Perplexity is $\exp$ of the entropy of the codeword usage on the test set.
+for $K\in\{\resKA,\resKB\}$ and seeds 0--2, for all five estimators. Perplexity is $\exp$ of the entropy of the codeword usage on the test set.
 \textbf{Choosing $\tau$.} For each estimator and $K$ we swept $\tau\in\{\resTauA,\dots,\resTauG\}$
 (seven values) with three seeds on a validation split of \resHoldout{} training images (models
 trained on the remaining \resValTrain{}), never touching the test set. The rule was fixed before
@@ -166,19 +167,22 @@ mean image ($\resBaselineMse\times10^{-3}$); a post-hoc descriptive criterion.}
 \label{tab:main}
 \end{table}
 
-Table~\ref{tab:main} has the numbers. We run no significance tests; with \resNSeeds{} seeds the
+Table~\ref{tab:main} has the numbers; we run no significance tests, and with \resNSeeds{} seeds the
 standard deviations are only indicative.
 
-\textbf{H1.} At $K=\resKA$, \est{gate\_norm} reaches an MSE of $\resMseGateNormKA\times10^{-3}$
-against $\resMseSteKA\times10^{-3}$ for \est{ste} (ratio $\resRatioMseGateNormKAOverSte$), and uses
-fewer codewords ($\resUsedGateNormKA\%$ against $\resUsedSteKA\%$). This is consistent with H1,
-though it is a whole-model measure and we did not isolate the encoder. The result is sensitive to
-$\tau$: the validation chose $\tau=\resChosenGateNormKA$ over $\tau=\resTauE$ by a small margin
+\textbf{H1.} \est{gate\_norm} is worse than \est{ste} at both sizes. At $K=\resKA$ it reaches an MSE of
+$\resMseGateNormKA\times10^{-3}$ against $\resMseSteKA\times10^{-3}$ (ratio
+$\resRatioMseGateNormKAOverSte$) and uses fewer codewords ($\resUsedGateNormKA\%$ against
+$\resUsedSteKA\%$); at $K=\resKB$ the gap is smaller ($\resMseGateNormKB\times10^{-3}$ against
+$\resMseSteKB\times10^{-3}$, ratio $\resRatioMseGateNormKBOverSte$) and it uses more
+($\resUsedGateNormKB\%$ against $\resUsedSteKB\%$). This is consistent with H1, though it is a
+whole-model measure and we did not isolate the encoder. The result is sensitive to $\tau$: at
+$K=\resKA$ the validation chose $\tau=\resChosenGateNormKA$ over $\tau=\resTauE$ by a small margin
 ($\resValMseGateNormKATC\pm\resValMseSdGateNormKATC$ against
-$\resValMseGateNormKATE\pm\resValMseSdGateNormKATE$, $\times10^{-3}$) and this choice does worse
+$\resValMseGateNormKATE\pm\resValMseSdGateNormKATE$, $\times10^{-3}$), and this choice does worse
 on the test set than the $\tau=\resTauE$ of our original grid, where $\tau$ was picked on the test
-set ($\resOrigMseGateNormKA\times10^{-3}$, ratio $\resOrigRatioMseGateNormKAOverSte$ to \est{ste}).
-\est{gate\_norm} is worse than \est{ste} under both choices.
+set ($\resOrigMseGateNormKA\times10^{-3}$, ratio $\resOrigRatioMseGateNormKAOverSte$ to \est{ste}),
+so it is worse than \est{ste} under both choices.
 
 \textbf{H2.} \est{gate\_cb} uses more of the codebook than \est{ste} at both sizes
 ($\resUsedGateCbKA\%$ against $\resUsedSteKA\%$ at $K=\resKA$; $\resUsedGateCbKB\%$ against
@@ -203,7 +207,8 @@ probabilities; unless $\tau$ is small the reconstruction then settles at the mea
 a long time, and a smaller $\tau$ shortens this plateau while a larger one lengthens it. We did not
 establish why; a plausible reason is that the codewords start almost identical, which we did not
 test.
-\est{ste\_ema} is close to \est{ste}. For \est{ste}, going from $K=\resKA$ to $K=\resKB$ did not
+\est{ste\_ema} is close to \est{ste} at both sizes ($\resMseSteEmaKB\times10^{-3}$ against
+$\resMseSteKB\times10^{-3}$ at $K=\resKB$). For \est{ste}, going from $K=\resKA$ to $K=\resKB$ did not
 reduce the error ($\resMseSteKA\times10^{-3}$ to $\resMseSteKB\times10^{-3}$) and left only
 $\resUsedSteKB\%$ of the codewords in use.
 
@@ -214,15 +219,13 @@ $\resUsedSteKB\%$ of the codewords in use.
   \est{gate\_norm}, whose chosen $\tau$ was worse on the test set than the one from our original
   grid; we kept the pre-registered rule and report both. One final run (\est{gate\_norm}, seed 0,
   $K=\resKA$) is the pilot run, which has the same configuration.
-\item \textbf{Few seeds, one dataset, one metric.} \resNSeeds{} seeds, CIFAR-10 only, reconstruction
-  metrics only, a fixed 20k-step budget. The ``failed'' flag was defined after seeing the data.
+\item \textbf{Few seeds, one dataset, one metric.} \resNSeeds{} seeds, CIFAR-10, reconstruction only, a
+  20k-step budget; the ``failed'' flag was defined after seeing the data.
 \item \textbf{The encoder is not isolated.} H1 is about the encoder, but we measured the
   reconstruction of the whole model; a probe on frozen latents would separate the two.
-\item \textbf{The \est{dense\_st} plateau is not explained.} The diagnostic covers one seed per
-  setting, 3000 steps and a different accelerator.
 \end{itemize}
 \textbf{Next steps} (to be decided): isolate the encoder; test the initialisation scale and a
-re-estimated $\tau$; evaluate the codebook-loss option of \est{gate\_cb}; more datasets and sizes.
+re-estimated $\tau$; the codebook-loss option of \est{gate\_cb}; more datasets.
 
 \bibliographystyle{plain}
 \bibliography{refs}

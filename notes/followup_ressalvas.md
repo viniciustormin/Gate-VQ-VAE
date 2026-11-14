@@ -207,3 +207,19 @@ Jobs #3421 a #3423 (21 execuções de validação) e #3420 (ste_ema final), todo
 nenhuma seed. Regra pré-registrada (scripts/select_tau.py): tau 0,3, validação 0,00572 ± 0,00086 (o segundo
 melhor, tau 1, tem 0,00886 ± 0,00432). As outras 5 células de main_tau_val.yaml não mudaram. Próximo passo:
 3 execuções finais do gate_norm K = 8192 em tau 0,3 no treino completo (job ext-gate-norm-k8192).
+
+---
+# Resultado da extensão: gate_norm e ste_ema em K = 8192 (escrito DEPOIS de rodar)
+
+Jobs #3420 (ste_ema) e #3432 (gate_norm, tau 0,3), `succeeded`. runs/khipu tem 44 execuções. MSE de teste final
+(x1e-3), média ± dp sobre 3 seeds, K = 8192: ste 4,10 ± 0,29; ste_ema 3,80 ± 0,31; gate_norm (tau 0,3)
+5,22 ± 0,59 (por seed 5,87 / 5,08 / 4,72); códigos usados 1,9% / 2,8% / 37,0%; perplexidade 132,9 / 188,4 / 385,4.
+
+Contra as expectativas escritas antes:
+1. H1 em K = 8192 (gate_norm pior que ste): CONFIRMADA, razão 1,27 (em K = 1024 a razão é 3,72 com o tau da
+   validação e 1,74 com o tau original). A diferença é menor em K = 8192.
+2. ste_ema próximo do ste: CONFIRMADA (3,80 contra 4,10, dentro de ~1 dp).
+3. Dependência do tau: a varredura de validação mostrou forte dependência (0,0057 em tau 0,3; 0,0218 em
+   tau 0,01) mas nenhuma falha.
+Fato novo: em K = 8192 o gate_norm usa MAIS códigos que o ste (37,0% contra 1,9%), ao contrário de K = 1024
+(12,9% contra 28,6%). Todos os 5 estimadores têm agora resultados nos dois K.
