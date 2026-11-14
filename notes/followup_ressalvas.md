@@ -152,3 +152,30 @@ gate_norm K=1024 em tau 0,1; dense_st K=1024 em tau 0,01; dense_st K=8192 em tau
 completo (50k), teste de verdade. A seed 0 de gate_norm tau 0,1 (K=1024) já existe do piloto e é reutilizada
 (mesma configuração). As execuções originais (tau 1 e tau 0,1) ficam em runs/khipu como rodada original. A
 tabela principal do paper passa a usar configs/khipu/main_tau_val.yaml.
+
+---
+# Resultado das reexecuções (escrito DEPOIS de rodar; as seções acima não foram alteradas)
+
+Jobs #3416 a #3418 (commit 0f6ef8b), todos `succeeded`: 8 execuções novas em runs/khipu (a seed 0 de
+gate_norm tau 0,1 já existia do piloto e foi reutilizada). Tabelas: a original (tau escolhido no TESTE,
+main_tau.yaml) ficou em paper/khipu/tables_tau_teste/; a nova (tau por VALIDAÇÃO, main_tau_val.yaml) está
+em paper/khipu/tables/ e é a principal do paper, como o plano dizia.
+
+MSE de teste final (x1e-3), média ± dp sobre 3 seeds, treino completo:
+
+| célula | tau teste -> validação | tau escolhido no teste | tau escolhido por validação | falhas |
+|---|---|---|---|---|
+| dense_st K=8192 | 0,1 -> 0,03 | 22,58 ± 34,00 | 2,66 ± 0,05 | 1/3 -> 0/3 |
+| dense_st K=1024 | 0,1 -> 0,01 | 3,34 ± 0,16 | 3,37 ± 0,01 | 0/3 -> 0/3 |
+| gate_norm K=1024 | 1 -> 0,1 | 6,31 ± 0,50 | 13,51 ± 3,24 | 0/3 -> 0/3 |
+| gate_cb K=1024 e 8192, ste, ste_ema | sem mudança de tau | iguais | iguais | 0/3 |
+
+## O que isso mostra
+- A "falha" do dense_st em K = 8192 era do tau (0,1 fica na zona de platô longo, como B indicou); com o tau
+  da validação nenhuma seed falha e o dense_st passa a ser o melhor estimador também em K = 8192.
+- gate_norm: o tau escolhido pela validação (0,1, por margem mínima: 0,01394 contra 0,01454 de tau 1,
+  com dp 0,0076 em tau 1) deu MSE de TESTE pior que o tau 1 da grade original (13,51 contra 6,31). A
+  validação (3 seeds, 45k imagens) foi ruidosa para este estimador. Seguimos a regra pré-registrada e
+  reportamos os dois resultados; NÃO retunamos depois de ver o teste. O gate_norm é pior que o ste nos
+  dois casos (razão 3,7 com o tau da validação, 1,7 com o do teste).
+- Os resultados de gate_cb, ste e ste_ema não dependem da escolha.
