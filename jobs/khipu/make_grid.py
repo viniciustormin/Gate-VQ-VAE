@@ -5,6 +5,8 @@
     uv run python jobs/khipu/make_grid.py k8192 --ms-per-step 20 --tau 1 --tau-map dense_st=0.1
     uv run python jobs/khipu/make_grid.py val     --ms-per-step 9
     uv run python jobs/khipu/make_grid.py rerun   --ms-per-step 12
+    uv run python jobs/khipu/make_grid.py val8192gn --ms-per-step 12
+    uv run python jobs/khipu/make_grid.py ext     --ms-per-step 12 --job ste_ema:8192:1
     uv run python jobs/khipu/make_grid.py val8192 --ms-per-step 12
 
 Fases (um job por estimador, as execuções do job rodam em sequência):
@@ -61,6 +63,16 @@ PHASES = {
         seeds=[0, 1, 2],
         exp="khipu",
     ),
+    "val8192gn": dict(  # gate_norm em K = 8192 (não estava no pedido original): mesma varredura
+        estimators=["gate_norm"],
+        ks=[8192],
+        seeds=[0, 1, 2],
+        taus=["0.01", "0.03", "0.1", "0.3", "1", "3", "10"],
+        exp="khipu_val",
+        extra="data.holdout=5000",
+        split_seeds=True,
+    ),
+    "ext": dict(jobs=None, seeds=[0, 1, 2], exp="khipu"),  # (estimador, K, tau) por --job
     "val8192": dict(
         estimators=["gate_cb", "dense_st"],
         ks=[8192],
@@ -88,7 +100,7 @@ def render(
     n = len(ks) * len(taus) * len(seeds)
     mt = max_time(n, steps, ms)
     name = f"khipu-{phase}-{est.replace('_', '-')}"
-    if phase == "rerun":
+    if phase in ("rerun", "ext"):
         name += f"-k{ks[0]}"
     if len(seeds) == 1 and phase.startswith("val"):
         name += f"-s{seeds[0]}"
@@ -99,6 +111,9 @@ def render(
         else "# Reexecução: tau escolhido por VALIDAÇÃO (scripts/select_tau.py) que difere do\n"
         "# usado na grade principal; ver notes/followup_ressalvas.md.\n#\n"
         if phase == "rerun"
+        else "# Execução adicional pedida depois do plano original (K = 8192); tau por\n"
+        "# VALIDAÇÃO quando existe. notes/followup_ressalvas.md.\n#\n"
+        if phase == "ext"
         else "# Varredura de tau por VALIDAÇÃO (5000 imagens do treino):\n"
         "# notes/followup_ressalvas.md.\n#\n"
         if phase.startswith("val")
@@ -149,10 +164,15 @@ def main() -> None:
     ap.add_argument("--memory", default="8g")
     ap.add_argument("--time-evidence", default="1ª ESTIMATIVA: ms/passo sem medida no sauron.")
     ap.add_argument("--memory-evidence", default="1ª ESTIMATIVA, sem pico medido.")
+    ap.add_argument("--job", action="append", default=[], help="fase ext: estimador:K:tau")
     ap.add_argument("--out", default=str(HERE))
     args = ap.parse_args()
 
-    cfg = PHASES[args.phase]
+    cfg = dict(PHASES[args.phase])
+    if args.phase == "ext":
+        if not args.job:
+            raise SystemExit("a fase ext exige --job estimador:K:tau (repita para mais de um)")
+        cfg["jobs"] = [(e, int(k), t) for e, k, t in (j.split(":") for j in args.job)]
     tau_map = dict(item.split("=") for item in args.tau_map.split(",") if item)
     out = Path(args.out)
     submit = [

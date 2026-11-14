@@ -179,3 +179,23 @@ MSE de teste final (x1e-3), média ± dp sobre 3 seeds, treino completo:
   reportamos os dois resultados; NÃO retunamos depois de ver o teste. O gate_norm é pior que o ste nos
   dois casos (razão 3,7 com o tau da validação, 1,7 com o do teste).
 - Os resultados de gate_cb, ste e ste_ema não dependem da escolha.
+
+---
+# Extensão: gate_norm e ste_ema em K = 8192 (escrito ANTES de rodar; pedido do Vinícius, 14/11/2026)
+
+Motivo: o pedido original (item c) só tinha ste, gate_cb e dense_st em K = 8192. H1 (gate_norm pior que ste)
+só foi testada em K = 1024, onde o gate_norm é instável; e ste_ema ficou sem K = 8192 na tabela.
+
+Plano (mesmas regras, nada muda no protocolo):
+- gate_norm K = 8192: varredura de validação com os MESMOS 7 tau, 3 seeds, 5000 imagens do treino de
+  validação (runs/khipu_val, 21 execuções); tau escolhido pela MESMA regra pré-registrada
+  (scripts/select_tau.py); depois 3 execuções finais no treino completo, no tau escolhido (runs/khipu).
+- ste_ema K = 8192: 3 execuções finais (seeds 0 a 2); não usa tau (tau = 1 só no nome da pasta).
+
+Expectativas (NÃO VERIFICADO; nenhum limiar a ser ajustado depois):
+1. H1 prevê MSE de teste do gate_norm MAIOR que o do ste (4,10 x 1e-3) em K = 8192. Se for menor, H1
+   NÃO vale em K = 8192 e o paper diz que ela só vale em K = 1024.
+2. ste_ema próximo do ste, como em K = 1024.
+3. Como o dense_st em K = 8192, o gate_norm pode ter platô e depender muito do tau; a varredura mostra.
+Se a varredura não tiver tau elegível (todas as seeds falham), relato isso e o gate_norm K = 8192 fica fora
+da tabela principal, declarado.
