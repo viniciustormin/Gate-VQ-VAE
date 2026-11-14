@@ -1,0 +1,31 @@
+# Fase val8192 do khipu: dense_st, K=8192, tau=0.01 0.03 0.1 0.3 1 3 10 (escala median),
+# seeds 1: 7 execuções de 20000 passos, em sequência, na mesma GPU.
+#
+#   sauron submit -c jobs/khipu/val8192-dense-st-s1.yaml jobs/khipu/job.sh
+#
+# Reenviar este job retoma do último checkpoint e pula o que já concluiu (run_group.sh --resume).
+#
+# Varredura de tau por VALIDAÇÃO (5000 imagens do treino):
+# notes/followup_ressalvas.md.
+#
+# max_time 1h: 12 ms/passo x 7 execuções x 20000 passos x 1.3 de folga.
+#   Medido na grade (jobs #3354-#3356): 9,0 a 11,4 ms/passo em K=8192 (20k passos completos); 12 arredonda para cima. 7 execuções por job.
+# memory 3g: pico medido 1,4 a 1,5 GiB nos jobs de K=8192 (#3354-#3356): 3g.
+name: khipu-val8192-dense-st-s1
+image: pytorch/pytorch:2.13.0-cuda13.0-cudnn9-devel
+gpus: 1
+vram: 89     # menor classe; o VQ-VAE é pequeno e o job gasta 89 GB da cota de qualquer jeito
+memory: 3g
+cpus: 2
+max_time: 1h
+
+workspace: Gate-VQ-VAE
+
+env:
+  EXP: "khipu_val"
+  ESTIMATORS: "dense_st"
+  SEEDS: "1"
+  KS: "8192"
+  TAUS: "0.01 0.03 0.1 0.3 1 3 10"
+  TAU_SCALE: "median"
+  EXTRA_OVERRIDES: "data.holdout=5000"

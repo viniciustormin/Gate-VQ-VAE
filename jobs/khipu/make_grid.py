@@ -3,11 +3,17 @@
     uv run python jobs/khipu/make_grid.py pilot --ms-per-step 40
     uv run python jobs/khipu/make_grid.py main  --ms-per-step 10 --tau 1 --tau-map dense_st=0.1
     uv run python jobs/khipu/make_grid.py k8192 --ms-per-step 20 --tau 1 --tau-map dense_st=0.1
+    uv run python jobs/khipu/make_grid.py val     --ms-per-step 9
+    uv run python jobs/khipu/make_grid.py val8192 --ms-per-step 12
 
 Fases (um job por estimador, as execuções do job rodam em sequência):
     pilot  gate_norm, gate_cb, dense_st | K=1024 | seed 0         | tau em {0.1, 1, 10} x mediana
     main   os 5 estimadores             | K=1024 | seeds 0, 1, 2  | tau escolhido por estimador
     k8192  ste, gate_cb, dense_st       | K=8192 | seeds 0, 1, 2  | tau escolhido por estimador
+    val    gate_norm, gate_cb, dense_st | K=1024 | seeds 0, 1, 2  | tau em {0.01 ... 10}, 7 valores
+    val8192 gate_cb, dense_st           | K=8192 | seeds 0, 1, 2  | os mesmos 7 valores de tau
+           em runs/khipu_val, com 5000 imagens do TREINO como validação (data.holdout); um job por
+           estimador e seed. Escolha de tau por validação: notes/followup_ressalvas.md.
 
 Em main e k8192 o tau de cada estimador vem de --tau-map (estimador=tau,...); quem não está no
 mapa usa --tau (ste e ste_ema não usam tau: ele só entra no nome da pasta da execução).
@@ -39,6 +45,24 @@ PHASES = {
         taus=None,
     ),
     "k8192": dict(estimators=["ste", "gate_cb", "dense_st"], ks=[8192], seeds=[0, 1, 2], taus=None),
+    "val": dict(
+        estimators=["gate_norm", "gate_cb", "dense_st"],
+        ks=[1024],
+        seeds=[0, 1, 2],
+        taus=["0.01", "0.03", "0.1", "0.3", "1", "3", "10"],
+        exp="khipu_val",
+        extra="data.holdout=5000",
+        split_seeds=True,  # um job por (estimador, seed)
+    ),
+    "val8192": dict(
+        estimators=["gate_cb", "dense_st"],
+        ks=[8192],
+        seeds=[0, 1, 2],
+        taus=["0.01", "0.03", "0.1", "0.3", "1", "3", "10"],
+        exp="khipu_val",
+        extra="data.holdout=5000",
+        split_seeds=True,
+    ),
 }
 
 
@@ -50,15 +74,22 @@ def max_time(n_runs: int, steps: int, ms_per_step: float) -> str:
 
 
 def render(
-    phase, est, ks, taus, seeds, tau_scale, steps, ms, memory, time_evidence, memory_evidence
-):
+    phase, est, ks, taus, seeds, tau_scale, steps, ms, memory, time_evidence, memory_evidence,
+    exp="khipu", extra="",
+):  # fmt: skip
     ks_s, taus_s, seeds_s = (" ".join(map(str, v)) for v in (ks, taus, seeds))
     n = len(ks) * len(taus) * len(seeds)
     mt = max_time(n, steps, ms)
     name = f"khipu-{phase}-{est.replace('_', '-')}"
+    if len(seeds) == 1 and phase.startswith("val"):
+        name += f"-s{seeds[0]}"
+    extra_line = f'  EXTRA_OVERRIDES: "{extra}"\n' if extra else ""
     tau_note = (
         ""
         if phase == "pilot"
+        else "# Varredura de tau por VALIDAÇÃO (5000 imagens do treino):\n"
+        "# notes/followup_ressalvas.md.\n#\n"
+        if phase.startswith("val")
         else "# tau escolhido pelo Vinícius a partir do piloto (notes/fase2_khipu.md):\n"
         "# por estimador, seleção no conjunto de teste, seed 0.\n#\n"
     )
@@ -83,13 +114,13 @@ max_time: {mt}
 workspace: Gate-VQ-VAE
 
 env:
-  EXP: "khipu"
+  EXP: "{exp}"
   ESTIMATORS: "{est}"
   SEEDS: "{seeds_s}"
   KS: "{ks_s}"
   TAUS: "{taus_s}"
   TAU_SCALE: "{tau_scale}"
-"""
+{extra_line}"""
     return name, text, mt
 
 
@@ -125,14 +156,17 @@ def main() -> None:
             if tau is None:
                 raise SystemExit(f"{est}: sem tau (use --tau-map {est}=<tau> ou --tau)")
             taus = [tau]
-        name, text, mt = render(
-            args.phase, est, cfg["ks"], taus, cfg["seeds"], args.tau_scale, args.steps,
-            args.ms_per_step, args.memory, args.time_evidence, args.memory_evidence,
-        )  # fmt: skip
-        fname = name.removeprefix("khipu-") + ".yaml"
-        (out / fname).write_text(text)
-        submit.append(f"sauron submit -c jobs/khipu/{fname} jobs/khipu/job.sh")
-        print(f"{fname}: max_time {mt}")
+        seed_groups = [[sd] for sd in cfg["seeds"]] if cfg.get("split_seeds") else [cfg["seeds"]]
+        for seeds in seed_groups:
+            name, text, mt = render(
+                args.phase, est, cfg["ks"], taus, seeds, args.tau_scale, args.steps,
+                args.ms_per_step, args.memory, args.time_evidence, args.memory_evidence,
+                exp=cfg.get("exp", "khipu"), extra=cfg.get("extra", ""),
+            )  # fmt: skip
+            fname = name.removeprefix("khipu-") + ".yaml"
+            (out / fname).write_text(text)
+            submit.append(f"sauron submit -c jobs/khipu/{fname} jobs/khipu/job.sh")
+            print(f"{fname}: max_time {mt}")
     (out / f"submit-{args.phase}.sh").write_text("\n".join(submit) + "\n")
 
 

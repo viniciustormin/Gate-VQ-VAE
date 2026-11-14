@@ -82,6 +82,14 @@ def _torchvision(cls_name: str, cfg: dict) -> Data:
         x = torch.as_tensor(ds.data)
         x = x[:, None] if x.ndim == 3 else x.permute(0, 3, 1, 2)  # -> (N, C, H, W)
         imgs.append(x.contiguous())
+    holdout = int(cfg.get("holdout", 0))
+    if holdout > 0:
+        # Validação para escolher hiperparâmetros sem tocar no teste: separa `holdout` imagens do
+        # TREINO (split fixo, semente própria) e as usa no lugar do teste. As métricas "test_*"
+        # dessas execuções são, portanto, de VALIDAÇÃO. Padrão 0: comportamento inalterado.
+        g = torch.Generator().manual_seed(int(cfg.get("holdout_seed", 12345)))
+        perm = torch.randperm(len(imgs[0]), generator=g)
+        return Data(imgs[0][perm[holdout:]], imgs[0][perm[:holdout]], 255.0)
     return Data(imgs[0], imgs[1], 255.0)
 
 

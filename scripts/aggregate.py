@@ -78,7 +78,11 @@ def mean_image_mse(data_root: str) -> float:
     return float(((test - train.mean(0, keepdim=True)) ** 2).mean())
 
 
-def chosen_tau(cfg: dict, estimator: str) -> float:
+def chosen_tau(cfg: dict, estimator: str, k: int | None = None) -> float:
+    """tau escolhido: por (estimador, K) se `by_estimator_k` o define, senão por estimador."""
+    by_k = cfg.get("by_estimator_k", {}).get(estimator, {})
+    if k is not None and k in by_k:
+        return float(by_k[k])
     return float(cfg.get("by_estimator", {}).get(estimator, cfg["default"]))
 
 
@@ -93,7 +97,7 @@ def is_failed(run: dict, baseline: float) -> bool:
 def main_rows(runs: list[dict], tau_cfg: dict, baseline: float) -> list[dict]:
     groups = defaultdict(list)
     for r in runs:
-        if r["tau"] == chosen_tau(tau_cfg, r["estimator"]):
+        if r["tau"] == chosen_tau(tau_cfg, r["estimator"], r["K"]):
             groups[(r["K"], r["estimator"])].append(r)
     rows = []
     for (k, est), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], ORDER.index(kv[0][1]))):

@@ -6,6 +6,7 @@
 #   ESTIMATORS SEEDS KS TAUS   listas separadas por espaço (obrigatórias)
 #   TAU_SCALE                  median (padrão) ou null
 #   EXP                        pasta em runs/ (padrão khipu)
+#   EXTRA_OVERRIDES            overrides a mais, separados por espaço (ex.: data.holdout=5000)
 #   MAX_STEPS EVAL_EVERY       só para testes curtos (padrão: os do YAML, 20000 e 2000)
 #   REQUIRE_CUDA               true (padrão): recusa rodar em CPU/MPS
 #   RUNNER                     comando do Python (padrão `python`; no Mac: `uv run python`)
@@ -20,6 +21,7 @@ read -r -a runner <<<"${RUNNER:-python}"
 : "${ESTIMATORS:?defina ESTIMATORS}" "${SEEDS:?defina SEEDS}" "${KS:?defina KS}" "${TAUS:?defina TAUS}"
 
 extra=()
+read -r -a extra_over <<<"${EXTRA_OVERRIDES:-}"
 [[ -n "${MAX_STEPS:-}" ]] && extra+=("train.max_steps=${MAX_STEPS}")
 [[ -n "${EVAL_EVERY:-}" ]] && extra+=("train.eval_every=${EVAL_EVERY}")
 
@@ -30,7 +32,7 @@ for est in ${ESTIMATORS}; do
         echo "=== ${est} K=${k} tau=${tau} (${TAU_SCALE}) seed=${seed} -> runs/${EXP} ==="
         "${runner[@]}" -m vqrouter.train --config "${CONFIG}" --resume --override \
           "estimator=${est}" "seed=${seed}" "exp=${EXP}" "vq.num_codes=${k}" "vq.tau=${tau}" \
-          "vq.tau_scale=${TAU_SCALE}" "require_cuda=${REQUIRE_CUDA}" ${extra[@]+"${extra[@]}"}
+          "vq.tau_scale=${TAU_SCALE}" "require_cuda=${REQUIRE_CUDA}" ${extra_over[@]+"${extra_over[@]}"} ${extra[@]+"${extra[@]}"}
       done
     done
   done
