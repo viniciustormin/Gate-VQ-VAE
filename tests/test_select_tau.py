@@ -90,3 +90,37 @@ def test_yaml_roundtrips_into_aggregate_chosen_tau():
     # sem entrada para o K pedido, cai no by_estimator (formato antigo de main_tau.yaml)
     old = {"default": 1.0, "by_estimator": {"dense_st": 0.1}}
     assert agg.chosen_tau(old, "dense_st", 8192) == 0.1
+
+
+def test_numbers_val_macros():
+    import re
+
+    rows = [
+        row("dense_st", 0.03, 0.00261, 0.00005, k=8192),
+        row("dense_st", 0.3, 0.0617, 0.0001, failed=3, k=8192),
+        row("gate_cb", 1.0, 0.00431, 0.0, k=1024),
+    ]
+    chosen = {("dense_st", 8192): 0.03, ("gate_cb", 1024): 1.0}
+    tex = sel.numbers_val_tex(rows, chosen, holdout=5000, n_train=45000)
+    defs = dict(re.findall(r"\\newcommand\{\\res(\w+)\}\{([^}]*)\}", tex))
+    assert defs["TauA"] == "0.03" and defs["TauB"] == "0.3" and defs["TauC"] == "1"
+    assert defs["ValMseDenseStKBTA"] == "2.61" and defs["ValFailedDenseStKBTB"] == "3/3"
+    assert defs["ChosenDenseStKB"] == "0.03" and defs["ChosenGateCbKA"] == "1"
+    assert defs["Holdout"] == "5000" and defs["ValTrain"] == "45000"
+    assert all(re.fullmatch(r"[A-Za-z]+", name) for name in defs)
+
+
+def test_all_fail_from_macro():
+    import re
+
+    rows = [
+        row("dense_st", t, 0.004 if f == 0 else 0.0617, 0.0001, failed=f, k=8192)
+        for t, f in [(0.03, 0), (0.1, 0), (0.3, 3), (1.0, 3), (3.0, 3)]
+    ]
+    rows += [row("gate_norm", t, 0.01, 0.001, failed=f) for t, f in [(0.1, 0), (1.0, 1), (3.0, 3)]]
+    tex = sel.numbers_val_tex(rows, {}, 5000, 45000)
+    defs = dict(re.findall(r"\\newcommand\{\\res(\w+)\}\{([^}]*)\}", tex))
+    assert defs["AllFailFromDenseStKB"] == "0.3"  # 0,3 e tudo acima falham nas 3 seeds
+    assert defs["AllFailFromGateNormKA"] == "3"  # só tau 3 (o maior) falha em todas
+    rows2 = [row("gate_cb", t, 0.004, 0.0001) for t in (0.1, 1.0)]
+    assert "AllFailFromGateCbKA" not in sel.numbers_val_tex(rows2, {}, 5000, 45000)

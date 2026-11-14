@@ -33,6 +33,7 @@ import yaml
 from vqrouter.data import load_dataset
 
 ORDER = ["ste", "ste_ema", "gate_norm", "gate_cb", "dense_st"]
+PILOT_TAUS = {0.1, 1.0, 10.0}  # o piloto original; tau novos (reexecuções) não entram
 NO_TAU = {"ste", "ste_ema"}  # não usam tau: ele só entra no nome da pasta
 COLLAPSE_PERPLEXITY = 2.0
 FAILED_FRACTION = 0.95  # de MSE_imagem_média
@@ -116,7 +117,14 @@ def main_rows(runs: list[dict], tau_cfg: dict, baseline: float) -> list[dict]:
 
 
 def pilot_rows(runs: list[dict]) -> list[dict]:
-    rows = [r for r in runs if r["K"] == 1024 and r["seed"] == 0 and r["estimator"] not in NO_TAU]
+    rows = [
+        r
+        for r in runs
+        if r["K"] == 1024
+        and r["seed"] == 0
+        and r["estimator"] not in NO_TAU
+        and r["tau"] in PILOT_TAUS
+    ]
     return sorted(rows, key=lambda r: (ORDER.index(r["estimator"]), r["tau"]))
 
 
@@ -139,7 +147,7 @@ NUMBER_METRICS = [  # (nome da macro, coluna, escala, casas decimais)
 ]
 
 
-def numbers_tex(rows: list[dict], pilot: list[dict], baseline: float) -> str:
+def numbers_tex(rows: list[dict], pilot: list[dict], baseline: float, prefix: str = "res") -> str:
     """Macros LaTeX com os números do texto. Nomes só com letras (o LaTeX não aceita dígitos):
     \\res<Métrica><Estimador>K<A|B>, com K<A|B> = K em ordem crescente (\\resKA = menor K)."""
     ks = sorted({r["K"] for r in rows})
@@ -147,7 +155,7 @@ def numbers_tex(rows: list[dict], pilot: list[dict], baseline: float) -> str:
     defs = []
 
     def d(name: str, value: str) -> None:
-        defs.append(f"\\newcommand{{\\res{name}}}{{{value}}}")
+        defs.append(f"\\newcommand{{\\{prefix}{name}}}{{{value}}}")
 
     for k in ks:
         d(tag[k], str(k))
@@ -236,6 +244,7 @@ def main() -> None:
     ap.add_argument("--tau-config", default="configs/khipu/main_tau.yaml")
     ap.add_argument("--out", default="paper/khipu/tables")
     ap.add_argument("--data-root", default="data", help="onde está o CIFAR-10 (baseline)")
+    ap.add_argument("--macro-prefix", default="res", help="prefixo dos macros de numbers.tex")
     args = ap.parse_args()
 
     runs = load_runs(Path(args.runs))
@@ -262,7 +271,7 @@ def main() -> None:
     pilot = pilot_rows(runs)
     write_csv(out / "table_pilot.csv", pilot)
     (out / "table_pilot.tex").write_text(tex_pilot(pilot, baseline))
-    (out / "numbers.tex").write_text(numbers_tex(main, pilot, baseline))
+    (out / "numbers.tex").write_text(numbers_tex(main, pilot, baseline, args.macro_prefix))
     print(f"{len(runs)} execuções; principal {len(main)} linhas, piloto {len(pilot)}; em {out}/")
     limite = FAILED_FRACTION * baseline
     print(f"baseline (imagem média): MSE {baseline:.5f}; falha = MSE >= {limite:.5f}")

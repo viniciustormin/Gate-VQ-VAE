@@ -17,7 +17,10 @@ def strip_comments(s: str) -> str:
 
 
 def test_every_result_macro_used_is_defined_in_numbers_tex():
-    numbers = (PAPER / "tables" / "numbers.tex").read_text()
+    numbers = "".join(
+        (PAPER / rel).read_text()
+        for rel in ("tables/numbers.tex", "tables/numbers_val.tex", "tables_tau_teste/numbers.tex")
+    )
     defined = set(re.findall(r"\\newcommand\{\\(res[A-Za-z]+)\}", numbers))
     used = set(re.findall(r"\\(res[A-Z][A-Za-z]*)", strip_comments(TEX)))
     assert used, "o texto não usa nenhum macro de resultado"

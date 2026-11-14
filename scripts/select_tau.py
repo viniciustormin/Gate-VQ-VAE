@@ -100,6 +100,44 @@ def tex_table(rows: list[dict], chosen: dict[tuple[str, int], float]) -> str:
     return head + "\n".join(lines) + "\n" + r"\bottomrule" "\n" r"\end{tabular}" "\n"
 
 
+def numbers_val_tex(rows: list[dict], chosen: dict, holdout: int, n_train: int) -> str:
+    """Macros LaTeX da varredura (nomes só com letras): \\resVal<Mse|MseSd|Failed><Est>K<A|B>T<A..>,
+    com T<A..> = tau em ordem crescente (\\resTauA = o menor), e \\resChosen<Est>K<A|B>."""
+    ks = sorted({r["K"] for r in rows})
+    taus = sorted({r["tau"] for r in rows})
+    ktag = {k: "K" + agg.TAGS[i] for i, k in enumerate(ks)}
+    ttag = {t: "T" + agg.TAGS[i] for i, t in enumerate(taus)}
+    defs = []
+
+    def d(name: str, value: str) -> None:
+        defs.append(f"\\newcommand{{\\res{name}}}{{{value}}}")
+
+    for t in taus:
+        d(f"Tau{ttag[t][1:]}", f"{t:g}")
+    d("Holdout", str(holdout))
+    d("ValTrain", str(n_train))
+    for r in rows:
+        key = f"{agg.CAMEL[r['estimator']]}{ktag[r['K']]}{ttag[r['tau']]}"
+        d(f"ValMse{key}", f"{r['val_mse_mean'] * 1e3:.2f}")
+        d(f"ValMseSd{key}", f"{r['val_mse_std'] * 1e3:.2f}")
+        d(f"ValFailed{key}", f"{r['n_failed']}/{r['n_seeds']}")
+    for (est, k), tau in chosen.items():
+        d(f"Chosen{agg.CAMEL[est]}{ktag[k]}", f"{tau:g}")
+    # menor tau a partir do qual TODAS as seeds falham, para esse tau e todos os maiores
+    for est, k in sorted({(r["estimator"], r["K"]) for r in rows}):
+        cell = sorted(
+            (r for r in rows if (r["estimator"], r["K"]) == (est, k)), key=lambda r: r["tau"]
+        )
+        tail = []
+        for r in reversed(cell):
+            if r["n_failed"] != r["n_seeds"]:
+                break
+            tail.append(r["tau"])
+        if tail:
+            d(f"AllFailFrom{agg.CAMEL[est]}{ktag[k]}", f"{min(tail):g}")
+    return "% gerado por scripts/select_tau.py: não editar à mão\n" + "\n".join(defs) + "\n"
+
+
 def tau_yaml(chosen: dict[tuple[str, int], float]) -> str:
     by = defaultdict(dict)
     for (est, k), tau in chosen.items():
@@ -139,6 +177,8 @@ def main() -> None:
         w.writeheader()
         w.writerows(rows)
     (out / "table_tau_val.tex").write_text(tex_table(rows, chosen))
+    n_train = len(load_dataset("cifar10", {"root": args.data_root, "holdout": args.holdout}).train)
+    (out / "numbers_val.tex").write_text(numbers_val_tex(rows, chosen, args.holdout, n_train))
     Path(args.out_yaml).write_text(tau_yaml(chosen))
 
     limite = FAILED_FRACTION * baseline
