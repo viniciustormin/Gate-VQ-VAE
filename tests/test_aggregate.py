@@ -4,6 +4,7 @@ import csv
 import importlib.util
 import json
 import math
+import re
 import statistics as st
 from pathlib import Path
 
@@ -116,3 +117,20 @@ def test_latex_escapes_names_and_marks_tau_unused(runs_dir):
     assert r"\texttt{dense\_st} & 0.1 &" in tex
     pilot = agg.tex_pilot(agg.pilot_rows(agg.load_runs(runs_dir)), BASELINE)
     assert "yes" in pilot and r"\texttt{ste" not in pilot  # ste não entra no piloto
+
+
+def test_numbers_macros_match_the_table(runs_dir):
+    make_run(runs_dir, "gate_norm", 1024, 1.0, 0, 0.0070)
+    runs = agg.load_runs(runs_dir)
+    rows = agg.main_rows(runs, TAU_CFG, BASELINE)
+    tex = agg.numbers_tex(rows, agg.pilot_rows(runs), BASELINE)
+    defs = dict(re.findall(r"\\newcommand\{\\res(\w+)\}\{([^}]*)\}", tex))
+    assert defs["KA"] == "1024"
+    assert defs["MseSteKA"] == f"{st.mean([0.0036, 0.0040, 0.0044]) * 1e3:.2f}"  # 4.00
+    assert defs["FailedSteKA"] == "0/3" and defs["BaselineMse"] == "60.0"
+    assert defs["RatioMseGateNormKAOverSte"] == "1.75"  # 7.0 / 4.0, razão das médias
+    assert "RatioMseSteKAOverSte" not in defs  # o ste não é comparado consigo mesmo
+    # piloto = K 1024, seed 0, sem ste: dense_st tau 0,1 + dense_st tau 10 + gate_norm tau 1;
+    # só o dense_st tau 10 (MSE 0,0601 >= 0,95 x 0,06) falha
+    assert defs["PilotRuns"] == "3" and defs["PilotFailed"] == "1"
+    assert all(re.fullmatch(r"[A-Za-z]+", name) for name in defs)  # só letras: macro válida

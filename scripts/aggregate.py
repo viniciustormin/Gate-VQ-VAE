@@ -7,6 +7,8 @@ Gera em --out:
     table_main.csv/.tex   por (K, estimador) no tau escolhido de configs/khipu/main_tau.yaml:
                           média e desvio amostral (ddof = 1) sobre as seeds
     table_pilot.csv/.tex  piloto: K = 1024, seed 0, todos os tau das execuções gate_* e dense_st
+    numbers.tex       macros \\resMseSteKA etc. com os números citados no texto do paper (o artigo
+                      usa só macros, nunca número digitado). KA, KB... = K em ordem crescente
 
 Duas contagens de falha, ambas DESCRITIVAS e definidas DEPOIS de ver os dados (não são limiares
 de decisão):
@@ -122,6 +124,52 @@ def write_csv(path: Path, rows: list[dict]) -> None:
 
 
 # --------------------------------------------------------------------------- LaTeX
+CAMEL = {"ste": "Ste", "ste_ema": "SteEma", "gate_norm": "GateNorm", "gate_cb": "GateCb",
+         "dense_st": "DenseSt"}  # fmt: skip
+TAGS = "ABCDEFGH"
+NUMBER_METRICS = [  # (nome da macro, coluna, escala, casas decimais)
+    ("Mse", "test_mse", 1e3, 2),
+    ("Psnr", "test_psnr", 1, 2),
+    ("Used", "codes_used_pct", 1, 1),
+    ("Perp", "perplexity", 1, 1),
+]
+
+
+def numbers_tex(rows: list[dict], pilot: list[dict], baseline: float) -> str:
+    """Macros LaTeX com os números do texto. Nomes só com letras (o LaTeX não aceita dígitos):
+    \\res<Métrica><Estimador>K<A|B>, com K<A|B> = K em ordem crescente (\\resKA = menor K)."""
+    ks = sorted({r["K"] for r in rows})
+    tag = {k: "K" + TAGS[i] for i, k in enumerate(ks)}
+    defs = []
+
+    def d(name: str, value: str) -> None:
+        defs.append(f"\\newcommand{{\\res{name}}}{{{value}}}")
+
+    for k in ks:
+        d(tag[k], str(k))
+    by = {(r["K"], r["estimator"]): r for r in rows}
+    for (k, est), r in by.items():
+        t = f"{CAMEL[est]}{tag[k]}"
+        for name, key, scale, nd in NUMBER_METRICS:
+            d(f"{name}{t}", f"{r[key + '_mean'] * scale:.{nd}f}")
+            d(f"{name}Sd{t}", f"{r[key + '_std'] * scale:.{nd}f}")
+        d(f"Failed{t}", f"{r['n_failed']}/{r['n_seeds']}")
+        if est != "ste" and (k, "ste") in by:  # razão das médias em relação ao ste, mesmo K
+            ref = by[(k, "ste")]
+            for name, key in [
+                ("Mse", "test_mse"),
+                ("Perp", "perplexity"),
+                ("Used", "codes_used_pct"),
+            ]:
+                d(f"Ratio{name}{t}OverSte", f"{r[key + '_mean'] / ref[key + '_mean']:.2f}")
+    d("BaselineMse", f"{baseline * 1e3:.1f}")
+    d("FailFraction", f"{FAILED_FRACTION:g}")
+    d("NSeeds", str(max(r["n_seeds"] for r in rows)))
+    d("PilotRuns", str(len(pilot)))
+    d("PilotFailed", str(sum(is_failed(r, baseline) for r in pilot)))
+    return "% gerado por scripts/aggregate.py: não editar à mão\n" + "\n".join(defs) + "\n"
+
+
 def tex_name(est: str) -> str:
     return r"\texttt{" + est.replace("_", r"\_") + "}"
 
@@ -210,6 +258,7 @@ def main() -> None:
     pilot = pilot_rows(runs)
     write_csv(out / "table_pilot.csv", pilot)
     (out / "table_pilot.tex").write_text(tex_pilot(pilot, baseline))
+    (out / "numbers.tex").write_text(numbers_tex(main, pilot, baseline))
     print(f"{len(runs)} execuções; principal {len(main)} linhas, piloto {len(pilot)}; em {out}/")
     limite = FAILED_FRACTION * baseline
     print(f"baseline (imagem média): MSE {baseline:.5f}; falha = MSE >= {limite:.5f}")
